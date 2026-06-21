@@ -16,8 +16,8 @@
    `codex`(OpenAI)、`gemini`(Google)會把你的**素材上傳到對方伺服器**——
    檢核機密/未發表內容前先想清楚。
 3. **計費風險**:`codex`/`gemini` 走雲端 API,多半**按 token 計費**(gemini 有免費額度但有上限)。
-   交叉檢核會把素材送給「所有可用後端」,後端越多、單次成本越高。在意花費就用 `--backends ollama`
-   只跑本機,或只在重要結論才開雲端後端。
+   交叉檢核**可指定要用哪些後端**(`--backends`);若不指定才會送給所有可用後端,後端越多、單次成本越高。
+   由 skill 驅動時預設只用離線的 `ollama`、動用雲端前會先徵得同意;在意花費就 `--backends ollama` 只跑本機。
 4. **設定後要讓它生效**:key 寫進 `~/.zshrc` 後,**重啟 Claude Code**(或新開 shell `source ~/.zshrc`)
    才會被讀到;否則 `--list` 仍顯示 unavailable。
 

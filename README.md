@@ -44,16 +44,18 @@ cross-ai-check/
 手動呼叫核心程式：
 
 ```bash
-# 看有哪些後端可用
+# 1. 先看有哪些檢核 AI 可用
 python3 scripts/cross_check.py --list
 
-# 送素材檢核（預設用所有可用後端；可用 --backends 指定）
+# 2. 用 --backends 指定這次要用哪些（逗號分隔；省略才是全用）
 python3 scripts/cross_check.py --prompt-file material.md \
+  --backends ollama,gemini \
   --system "<該模式的 system prompt，見 SKILL.md>"
 ```
 
-輸出為 JSON，每個後端含 `available`/`ok`/`response`/`error`。**只用免費離線的 `ollama`、
-或完全不啟用交叉檢核都可以——本功能非必要。**
+**可自由選擇要用哪些檢核 AI**：由 Claude 驅動時，會在執行前列出可用後端讓你挑（預設只勾離線的 `ollama`，
+動用雲端後端前會先徵得同意）；手動呼叫則用 `--backends` 指定。輸出為 JSON，每個後端含
+`available`/`ok`/`response`/`error`。**只用免費離線的 `ollama`、或完全不啟用交叉檢核都可以——本功能非必要。**
 
 ---
 
@@ -79,7 +81,8 @@ python3 scripts/cross_check.py --prompt-file material.md \
 ## 💳 API 風險與費用
 
 - `codex`/`gemini` 走雲端 API，多半**按 token 計費**（`gemini` 有免費額度但有上限）。
-- 預設會把素材送給**所有可用後端**——後端越多、單次成本越高。在意花費就 `--backends ollama` 只跑本機。
+- 由 Claude 驅動時預設只用離線的 `ollama`,動用雲端後端會先徵得同意;**你可隨時指定只用哪些後端**——
+  後端越多、單次成本越高。在意花費就 `--backends ollama` 只跑本機。
 - 費用由使用者自行承擔；請自行留意供應商用量與帳單。
 
 ## 🔑 金鑰安全

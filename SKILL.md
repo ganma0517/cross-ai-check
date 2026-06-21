@@ -70,14 +70,34 @@ description: >-
 把要檢核的東西寫成一個檔(例如 `/tmp/cc_material.md`):放**原始素材**(程式碼片段、主張與其引用、
 推理段落)與**中性問句**。依模式選 system prompt(見下方「三種模式」)。不要寫進 Claude 的判斷。
 
-### 3. 呼叫外部模型
+### 2.5 讓使用者選擇要用哪些檢核 AI（執行前必做）
+**不要逕自把素材送給所有後端。** 先列出可用後端,讓使用者決定這次用哪些——這同時是隱私與費用的把關點。
+
+```bash
+python3 ~/.claude/skills/cross-ai-check/scripts/cross_check.py --list
+```
+
+把結果整理成簡短清單給使用者選,並標出各自的性質,例如:
+- `ollama`（本機·離線·免費）— 不外送素材,隱私最佳
+- `gemini`（雲端·Google·有免費額度）— 會上傳素材
+- `codex`（雲端·OpenAI·按量計費）— 會上傳素材
+
+選擇原則:
+- **使用者已指明**（例:「只用 ollama」「也讓 gemini 看」）→ 照辦。
+- **未指明**→ 主動詢問要用哪些(可用 AskUserQuestion 列出可用後端多選)。**預設只勾離線的 `ollama`**;
+  要動用雲端後端(會外送素材＋可能計費)前,先取得使用者同意。
+- **檢核機密／未發表內容**→ 提醒優先只用 `ollama`。
+- 使用者選定後,用 `--backends` 帶入(見下一步);沒有任何可用後端就跳到本步驟末的 0 後端處理。
+
+### 3. 呼叫外部模型（用上一步選定的後端）
 ```bash
 python3 ~/.claude/skills/cross-ai-check/scripts/cross_check.py \
   --prompt-file /tmp/cc_material.md \
+  --backends <使用者選定的後端,逗號分隔,例 ollama,gemini> \
   --system "<該模式的 system prompt>"
 ```
-- 預設用**所有可用後端**;要指定就加 `--backends ollama,codex`。
-- 想先看有哪些後端可用:加 `--list`。
+- `--backends` 用 2.5 步使用者**實際選定**的後端;省略才是「所有可用」——但本 skill 預設要先問,不要省略。
+- 後端名可用短名(`ollama`/`codex`/`gemini`)或完整名(`ollama:qwen2.5:7b`)。
 - 輸出是 JSON:每個後端有 `available`/`ok`/`response`/`error`。讀 `response` 作為該模型的獨立意見。
 - 若 `summary.available` 為 0(沒有任何後端可用),如實告訴使用者並附上 `error` 裡的安裝提示,
   改用 Claude 自評,**不要假裝做了交叉檢核**。
