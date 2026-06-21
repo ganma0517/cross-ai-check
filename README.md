@@ -1,105 +1,105 @@
 # cross-ai-check（跨 AI 交叉檢核）
 
-> **作者 / Author**：Wen-Cheng Lin　｜　**狀態：實驗性 skill（experimental）**
+> **作者**：Wen-Cheng Lin　｜　**這是實驗性工具（experimental）**
 >
-> ⚠️ 本 skill 仍在迭代，行為與輸出可能變動。它提供的是**輔助性第二意見，不保證正確**；
-> 重要判斷請自行覆核。是否採用、採用到什麼程度，由使用者自行評估與負責。
+> ⚠️ 還在開發中，行為可能改變。它只是幫你「找第二意見」，**不保證答案正確**，重要的事請自己再確認。要不要用、用到什麼程度，由你自己決定。
 
-一個 [Claude Code](https://docs.claude.com/en/docs/claude-code) skill：把 Claude 自己得出的結論，
-交給**其他獨立 AI 模型**（本機 `ollama`、雲端 `codex`/`gemini`）重做一次判斷，收集分歧點後再由 Claude 彙整裁決。
-價值來自**獨立性**——不同模型在不同地方出錯，兩邊都同意的部分才是高信心結論。
+## 這是什麼？
 
-三種檢核模式：**程式碼 review**（bug／安全／設計）、**事實與文獻查證**（主張與引用真偽）、
-**通用推理檢核**（邏輯漏洞與反方意見）。
+這是一個 [Claude Code](https://docs.claude.com/en/docs/claude-code) 的外掛（skill）。
+
+簡單說：Claude 先給出一個答案，然後這個工具會把**同樣的題目**交給**別的 AI**（你電腦裡的 `ollama`，或雲端的 `gemini`、`codex`）再算一次，最後比對大家的答案。
+
+為什麼有用？因為不同的 AI 會在不同地方出錯。**大家都同意的部分，比較可信；意見不一樣的地方，就要特別注意。**
+
+可以用在三種情況：
+- **看程式碼**：找 bug、安全問題、設計缺陷
+- **查資料**：判斷某個說法、某篇文獻引用是不是真的
+- **檢查推理**：找出邏輯漏洞、想想反方觀點
 
 ---
 
-## 構成結構
+## 檔案結構
 
 ```
 cross-ai-check/
-├── SKILL.md                  # skill 主檔：觸發描述、工作流程、三種模式、裁決規則
-├── README.md                 # 本檔：總覽、注意事項、隱私與 API 風險
+├── SKILL.md                  # 給 Claude 看的操作說明（怎麼跑這個流程）
+├── README.md                 # 你現在看的這份：總覽與注意事項
 ├── scripts/
-│   ├── cross_check.py         # 核心：多後端獨立意見收集器（偵測→送素材→回 JSON）
-│   └── set-api-key.sh         # 防呆設定 API key 到 ~/.zshrc（隱藏輸入/擋空值/去重）
+│   ├── cross_check.py         # 主程式：把題目發給各個 AI，收回它們的答案
+│   └── set-api-key.sh         # 幫你安全地把 API 金鑰存進電腦的小工具
 ├── references/
-│   └── backends.md            # 後端安裝/設定、安全須知、自訂後端範例
+│   └── backends.md            # 各個 AI 後端怎麼安裝、設定的細節
 └── evals/
-    └── evals.json             # 觸發評測樣本
+    └── evals.json             # 測試用的範例題
 ```
 
-| 檔案 | 角色 |
+| 檔案 | 做什麼 |
 |------|------|
-| `SKILL.md` | Claude 讀的指令本體；定義「先自評 → 送中性素材給外部模型 → 比對裁決」流程 |
-| `scripts/cross_check.py` | 真正執行的程式；對所有**可用**後端送出 prompt，任一後端缺裝/缺 key 就跳過並標註，不讓整批失敗 |
-| `scripts/set-api-key.sh` | 安全寫入 key 的小工具，避開「空值／重複行／進 shell history」等坑 |
-| `references/backends.md` | 各後端細節與安全規範（深入內容） |
+| `SKILL.md` | Claude 的操作手冊：先自己想答案 → 把題目交給別的 AI → 比對後下結論 |
+| `scripts/cross_check.py` | 真正執行的程式。哪個 AI 沒裝好就自動跳過，不會整個壞掉 |
+| `scripts/set-api-key.sh` | 安全存金鑰，避免常見錯誤（存成空白、重複、被記錄下來） |
+| `references/backends.md` | 想深入設定各個 AI 時看這份 |
 
 ---
 
-## 使用方式（摘要）
+## 怎麼用
 
-實際由 Claude 依 `SKILL.md` 驅動，使用者通常只要說「用別的 AI 再檢查一次」「跨 AI 比對」「找第二意見」即可。
-手動呼叫核心程式：
+平常你只要跟 Claude 說「**用別的 AI 再檢查一次**」「**找第二意見**」就會啟動，不用記指令。
+
+如果想自己手動跑：
 
 ```bash
-# 1. 先看有哪些檢核 AI 可用
+# 1. 先看有哪些 AI 可以用
 python3 scripts/cross_check.py --list
 
-# 2. 用 --backends 指定這次要用哪些（逗號分隔；省略才是全用）
-python3 scripts/cross_check.py --prompt-file material.md \
+# 2. 指定這次要用哪幾個 AI（用逗號隔開）
+python3 scripts/cross_check.py --prompt-file 題目.md \
   --backends ollama,gemini \
-  --system "<該模式的 system prompt，見 SKILL.md>"
+  --system "<要它扮演什麼角色，見 SKILL.md>"
 ```
 
-**可自由選擇要用哪些檢核 AI**：由 Claude 驅動時，會在執行前列出可用後端讓你挑（預設只勾離線的 `ollama`，
-動用雲端後端前會先徵得同意）；手動呼叫則用 `--backends` 指定。輸出為 JSON，每個後端含
-`available`/`ok`/`response`/`error`。**只用免費離線的 `ollama`、或完全不啟用交叉檢核都可以——本功能非必要。**
+**你可以自己選要用哪些 AI**。由 Claude 帶你跑時，它會先列出可用的 AI 讓你挑（預設只用免費、離線的 `ollama`；要用雲端的會先問過你）。
+
+> 提醒：這個功能**不是必要的**。只用免費離線的 `ollama`，或乾脆不用交叉檢核，都完全沒問題。
 
 ---
 
-## ⚠️ 使用注意事項
+## 使用前要知道的事
 
-1. **這是第二意見，不是裁判**：外部模型**也會幻覺**，尤其本機小模型（如 `qwen2.5:7b`）能力有限、
-   有時答非所問。它的角色是「找遺漏、標分歧」，最終裁決仍由 Claude 回到原始素材判斷。
-2. **送素材、不送結論**：交叉檢核靠獨立性。把 Claude 的答案直接丟去問「對不對」會造成附和（anchoring），
-   失去意義。`SKILL.md` 已規範只送原始素材＋中性問句。
-3. **文獻真偽靠檢索、不靠 LLM**：某篇論文是否真實存在，要用搜尋／學術資料庫查，不能問另一個沒連網的模型。
-4. **設定 key 後需重啟 Claude Code** 才會讀到新環境變數。
+1. **別的 AI 也會出錯**，尤其電腦裡的小型 AI 能力有限，有時還會答非所問。它的用處是「多一雙眼睛」，最後判斷還是要靠 Claude 回頭核對原始資料。
+2. **查文獻真假要靠搜尋，不能靠 AI**。一個沒連網的 AI 不知道某篇論文存不存在，問它只會亂猜。
+3. **設定金鑰後要重開 Claude Code**，新設定才會生效。
 
-## 🔐 隱私權
+## 隱私
 
-| 後端 | 資料流向 | 適用 |
+| AI 後端 | 你的資料會怎樣 | 適合 |
 |------|---------|------|
-| `ollama`（本機） | **完全離線**，素材不離開你的電腦 | 機密／未發表內容首選 |
-| `codex`（OpenAI）、`gemini`（Google） | 你送檢的素材會**上傳到對方伺服器** | 一般、非敏感內容 |
+| `ollama`（你的電腦） | **不外傳**，完全留在本機 | 機密、還沒發表的內容 |
+| `gemini`、`codex`（雲端） | 會**上傳到 Google／OpenAI** | 一般、不敏感的內容 |
 
-- 檢核**機密或未發表內容**前，請優先用 `ollama`，或乾脆不啟用雲端後端。
-- 雲端供應商對資料的留存／訓練政策以**各家條款為準**，本 skill 無法控制；介意者請走離線。
+要檢查機密或未發表的東西，請用 `ollama`，或乾脆別用雲端的。雲端供應商怎麼處理你的資料，看他們的條款，這個工具管不到。
 
-## 💳 API 風險與費用
+## 費用
 
-- `codex`/`gemini` 走雲端 API，多半**按 token 計費**（`gemini` 有免費額度但有上限）。
-- 由 Claude 驅動時預設只用離線的 `ollama`,動用雲端後端會先徵得同意;**你可隨時指定只用哪些後端**——
-  後端越多、單次成本越高。在意花費就 `--backends ollama` 只跑本機。
-- 費用由使用者自行承擔；請自行留意供應商用量與帳單。
+- 雲端的 `gemini`、`codex` 大多**按使用量收費**（`gemini` 有免費額度，但有上限）。
+- 用的 AI 越多，一次花得越多。想省錢就只用本機的 `ollama`。
+- 費用要你自己承擔，記得留意帳單。
 
-## 🔑 金鑰安全
+## 金鑰安全
 
-- **切勿把 API key 貼進任何對話框**（Claude／ChatGPT／Gemini 等）——會留進紀錄，等同外洩，須立即撤銷重發。
-- key 只該存在本機 `~/.zshrc`，可用附帶腳本安全寫入：
+- **絕對不要把 API 金鑰貼到任何聊天視窗**（Claude、ChatGPT、Gemini 都一樣）。一旦貼出去就等於外洩，要馬上去原網站作廢、重新申請。
+- 金鑰只該存在你電腦的 `~/.zshrc`。可以用內附的工具安全存入：
   ```bash
-  zsh scripts/set-api-key.sh GEMINI_API_KEY   # 提示→貼 key→Enter→✅ 已寫入
+  zsh scripts/set-api-key.sh GEMINI_API_KEY   # 跳出提示 → 貼金鑰 → Enter → 完成
   zsh scripts/set-api-key.sh OPENAI_API_KEY
   ```
-- 別把 key 寫進任何會被 git commit 的檔案。
+- 也別把金鑰寫進任何會上傳到 GitHub 的檔案。
 
-各後端安裝與詳細設定見 [`references/backends.md`](references/backends.md)。
+各個 AI 怎麼安裝設定，看 [`references/backends.md`](references/backends.md)。
 
 ---
 
 ## 免責聲明
 
-本 skill 為實驗性個人專案，**按現狀（as-is）提供，不負任何擔保**。使用前請自行評估是否適用，
-並對輸出結果自行覆核與負責。
+這是一個實驗性的個人專案，**照現況提供，不負任何擔保**。用之前請自己評估適不適合，輸出的結果也請自己再確認。
