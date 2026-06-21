@@ -80,8 +80,16 @@ def _codex_run(prompt, system):
 
 
 def _gemini_detect():
-    # Google Gemini CLI:`gemini -p`,需 GEMINI_API_KEY 或 gcloud 授權。
-    return bool(shutil.which("gemini"))
+    # Google Gemini CLI:`gemini -p`,需 GEMINI_API_KEY 或 gcloud/OAuth 授權。
+    # 與 codex 一致:CLI 在還不夠,沒 key/授權 runtime 仍會失敗,故 detect 階段就一併檢查,
+    # 避免 --list 顯示 available 但實跑才報錯。
+    if not shutil.which("gemini"):
+        return False
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return True
+    # OAuth/gcloud 授權憑證(gemini-cli 登入後寫於 ~/.gemini/)
+    creds = os.path.expanduser("~/.gemini/oauth_creds.json")
+    return os.path.exists(creds)
 
 
 def _gemini_run(prompt, system):
