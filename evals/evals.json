@@ -1,0 +1,26 @@
+{
+  "skill_name": "cross-ai-check",
+  "evals": [
+    {
+      "id": 0,
+      "name": "code-review",
+      "prompt": "這段 Python 我總覺得哪裡怪,但看不出來。你先自己看,然後最好也用別的 AI 交叉檢查一次再給我結論,我不想只信單一模型:\n\ndef get_discount(price, user):\n    if user.is_vip:\n        return price * 0.8\n    elif user.age > 65:\n        return price * 0.9\n",
+      "expected_output": "Claude 先自評 → 呼叫外部模型(ollama)獨立 review → 彙整共識/分歧/最終結論。應抓到:一般使用者落到無 return 回傳 None、price 為負未處理、age 邊界等。",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "fact-check",
+      "prompt": "我文獻回顧寫了這句,想交叉驗證一下、別只信你自己的判斷:『根據 Smith (2019) 發表於 Nature 的研究,每天喝 3 杯咖啡可降低 50% 的心臟病風險。』這句可信嗎?",
+      "expected_output": "Claude 先判斷 → 送外部模型獨立查核 → 彙整。應對過度精確的數字(50%)、模糊來源(Smith 2019/Nature)、因果宣稱表達懷疑,並標明無法佐證。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "reasoning",
+      "prompt": "幫我看這段論證有沒有邏輯漏洞,最好找第二個 AI 意見一起判斷:『我們的 A/B 測試顯示新版頁面轉換率比較高,所以新設計更好,應該全面上線。』",
+      "expected_output": "Claude 先檢視 → 送外部模型獨立找漏洞 → 彙整。應點出樣本/統計顯著性未知、相關不等於因果、可能有其他變因、單一指標不足以決定全面上線。",
+      "files": []
+    }
+  ]
+}
