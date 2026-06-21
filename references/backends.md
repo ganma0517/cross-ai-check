@@ -25,11 +25,11 @@
 
 手打 `read -s ... >> ~/.zshrc` 容易踩雷:**貼上失敗寫出空值**(`export X=` 後面空白)、
 或**重複設定堆出多行**。建議用一支防呆小腳本:隱藏輸入、擋空值、自動去重舊行、寫完遮罩確認。
-參考實作 `~/.claude/set-api-key.sh`,用法:
+本 skill 附帶的 `scripts/set-api-key.sh` 即為此用,用法(路徑依 skill 實際位置):
 
 ```bash
-zsh ~/.claude/set-api-key.sh GEMINI_API_KEY   # 看到提示→貼 key→Enter→✅ 已寫入
-zsh ~/.claude/set-api-key.sh OPENAI_API_KEY
+zsh ~/.claude/skills/cross-ai-check/scripts/set-api-key.sh GEMINI_API_KEY   # 提示→貼 key→Enter→✅ 已寫入
+zsh ~/.claude/skills/cross-ai-check/scripts/set-api-key.sh OPENAI_API_KEY
 ```
 
 驗證是否寫入(不洩漏內容,只看長度與開頭):
@@ -47,7 +47,7 @@ grep '^export GEMINI_API_KEY=' ~/.zshrc | sed 's/=.*/=<已設定>/'
 
 ## codex(OpenAI Codex CLI)
 - 安裝:`npm i -g @openai/codex`
-- 設定:`export OPENAI_API_KEY=sk-...`(用上面的 `set-api-key.sh` 寫進 `~/.zshrc`)。
+- 設定:`export OPENAI_API_KEY=sk-...`(用上面的 `scripts/set-api-key.sh` 寫進 `~/.zshrc`)。
   key 從 https://platform.openai.com/api-keys 製作,**帳號需先綁付款方式**,否則呼叫會回 quota 錯誤。
 - 腳本用非互動模式 `codex exec "<prompt>"`,避免卡在互動 REPL。
 - 偵測條件:`which codex` **且**環境有 `OPENAI_API_KEY`(兩者缺一就 unavailable)。
@@ -55,7 +55,7 @@ grep '^export GEMINI_API_KEY=' ~/.zshrc | sed 's/=.*/=<已設定>/'
 
 ## gemini(Google Gemini CLI)
 - 安裝:`npm i -g @google/gemini-cli`
-- 設定:`export GEMINI_API_KEY=...`(用 `set-api-key.sh`;key 從 https://aistudio.google.com/apikey 製作,有免費額度)。
+- 設定:`export GEMINI_API_KEY=...`(用 `scripts/set-api-key.sh`;key 從 https://aistudio.google.com/apikey 製作,有免費額度)。
   或改用 `gemini` 互動式 **Google 帳號 OAuth 登入**(免 key,憑證存 `~/.gemini/`)。
 - 腳本用 `gemini -p "<prompt>"`。
 - 偵測條件:**只看** `which gemini`——所以 `--list` 可能顯示 available,但**執行時仍需 key 或已登入**,
