@@ -1,105 +1,119 @@
-# cross-ai-check（跨 AI 交叉檢核）
+# cross-ai-check
 
-> **作者**：Wen-Cheng Lin　｜　**這是實驗性工具（experimental）**
+> **Author**: Wen-Cheng Lin　｜　**Experimental skill**
 >
-> ⚠️ 還在開發中，行為可能改變。它只是幫你「找第二意見」，**不保證答案正確**，重要的事請自己再確認。要不要用、用到什麼程度，由你自己決定。
+> ⚠️ Still under development; behavior may change. It only gives you a **second opinion** — it does **not** guarantee correct answers. Double-check anything important yourself. Whether and how much to rely on it is your call.
 
-## 這是什麼？
+## What it is
 
-這是一個 [Claude Code](https://docs.claude.com/en/docs/claude-code) 的外掛（skill）。
+A [Claude Code](https://docs.claude.com/en/docs/claude-code) **skill**.
 
-簡單說：Claude 先給出一個答案，然後這個工具會把**同樣的題目**交給**別的 AI**（你電腦裡的 `ollama`，或雲端的 `gemini`、`codex`）再算一次，最後比對大家的答案。
+In short: Claude first produces an answer, then this tool hands the **same question** to **other AIs** (`ollama` on your own machine, or cloud models `gemini` / `codex`) to solve again, and finally compares everyone's answers.
 
-為什麼有用？因為不同的 AI 會在不同地方出錯。**大家都同意的部分，比較可信；意見不一樣的地方，就要特別注意。**
+Why it helps: different AIs fail in different places. **Where they all agree is more trustworthy; where they disagree is what you should look at carefully.**
 
-可以用在三種情況：
-- **看程式碼**：找 bug、安全問題、設計缺陷
-- **查資料**：判斷某個說法、某篇文獻引用是不是真的
-- **檢查推理**：找出邏輯漏洞、想想反方觀點
+Three modes:
+- **Code review** — bugs, security, design flaws
+- **Fact / citation check** — whether a claim or a cited reference is real
+- **Reasoning check** — logical gaps and counter-arguments
 
 ---
 
-## 檔案結構
+## Structure
 
 ```
 cross-ai-check/
-├── SKILL.md                  # 給 Claude 看的操作說明（怎麼跑這個流程）
-├── README.md                 # 你現在看的這份：總覽與注意事項
+├── SKILL.md                  # Instructions Claude reads (how to run the flow)
+├── README.md                 # This file: overview and cautions
 ├── scripts/
-│   ├── cross_check.py         # 主程式：把題目發給各個 AI，收回它們的答案
-│   └── set-api-key.sh         # 幫你安全地把 API 金鑰存進電腦的小工具
+│   ├── cross_check.py         # Core: sends the question to each AI, collects answers
+│   └── set-api-key.sh         # Helper to safely store an API key in ~/.zshrc
 ├── references/
-│   └── backends.md            # 各個 AI 後端怎麼安裝、設定的細節
+│   └── backends.md            # How to install / configure each AI backend
 └── evals/
-    └── evals.json             # 測試用的範例題
+    └── evals.json             # Sample questions for testing
 ```
 
-| 檔案 | 做什麼 |
+| File | Role |
 |------|------|
-| `SKILL.md` | Claude 的操作手冊：先自己想答案 → 把題目交給別的 AI → 比對後下結論 |
-| `scripts/cross_check.py` | 真正執行的程式。哪個 AI 沒裝好就自動跳過，不會整個壞掉 |
-| `scripts/set-api-key.sh` | 安全存金鑰，避免常見錯誤（存成空白、重複、被記錄下來） |
-| `references/backends.md` | 想深入設定各個 AI 時看這份 |
+| `SKILL.md` | Claude's playbook: form its own answer → hand the question to other AIs → compare and conclude |
+| `scripts/cross_check.py` | The program that runs. A backend that isn't set up is skipped, not fatal |
+| `scripts/set-api-key.sh` | Stores keys safely, avoiding common mistakes (empty value, duplicates, shell history) |
+| `references/backends.md` | Read this for deeper per-backend setup |
 
 ---
 
-## 怎麼用
+## Usage
 
-平常你只要跟 Claude 說「**用別的 AI 再檢查一次**」「**找第二意見**」就會啟動，不用記指令。
+Normally you just tell Claude "**check this again with another AI**" or "**get a second opinion**" — no commands to memorize.
 
-如果想自己手動跑：
+To run it manually:
 
 ```bash
-# 1. 先看有哪些 AI 可以用
+# 1. See which AIs are available
 python3 scripts/cross_check.py --list
 
-# 2. 指定這次要用哪幾個 AI（用逗號隔開）
-python3 scripts/cross_check.py --prompt-file 題目.md \
+# 2. Choose which AIs to use this time (comma-separated)
+python3 scripts/cross_check.py --prompt-file question.md \
   --backends ollama,gemini \
-  --system "<要它扮演什麼角色，見 SKILL.md>"
+  --system "<role for the AI to play; see SKILL.md>"
 ```
 
-**你可以自己選要用哪些 AI**。由 Claude 帶你跑時，它會先列出可用的 AI 讓你挑（預設只用免費、離線的 `ollama`；要用雲端的會先問過你）。
+**You can pick which AIs to use.** When Claude drives it, it lists the available AIs and lets you choose (default is the free, offline `ollama`; it asks before using cloud ones).
 
-> 提醒：這個功能**不是必要的**。只用免費離線的 `ollama`，或乾脆不用交叉檢核，都完全沒問題。
+> Note: this feature is **optional**. Using only the free offline `ollama`, or not using cross-checking at all, is perfectly fine.
 
 ---
 
-## 使用前要知道的事
+## Before you use it
 
-1. **別的 AI 也會出錯**，尤其電腦裡的小型 AI 能力有限，有時還會答非所問。它的用處是「多一雙眼睛」，最後判斷還是要靠 Claude 回頭核對原始資料。
-2. **查文獻真假要靠搜尋，不能靠 AI**。一個沒連網的 AI 不知道某篇論文存不存在，問它只會亂猜。
-3. **設定金鑰後要重開 Claude Code**，新設定才會生效。
+1. **Other AIs make mistakes too**, especially small local models, which sometimes answer off-topic. Treat them as "an extra pair of eyes"; the final judgment still comes from Claude checking the original material.
+2. **Checking whether a reference is real needs search, not an AI.** An offline AI doesn't know if a paper exists and will just guess.
+3. **Restart Claude Code after setting a key** so the new setting takes effect.
 
-## 隱私
+## Privacy
 
-| AI 後端 | 你的資料會怎樣 | 適合 |
+| Backend | What happens to your data | Good for |
 |------|---------|------|
-| `ollama`（你的電腦） | **不外傳**，完全留在本機 | 機密、還沒發表的內容 |
-| `gemini`、`codex`（雲端） | 會**上傳到 Google／OpenAI** | 一般、不敏感的內容 |
+| `ollama` (your machine) | **Stays local**, never uploaded | confidential or unpublished content |
+| `gemini`, `codex` (cloud) | **Uploaded** to Google / OpenAI | general, non-sensitive content |
 
-要檢查機密或未發表的東西，請用 `ollama`，或乾脆別用雲端的。雲端供應商怎麼處理你的資料，看他們的條款，這個工具管不到。
+For confidential or unpublished material, use `ollama` or skip the cloud backends. How providers handle your data is governed by their own terms — this tool can't control that.
 
-## 費用
+## Cost
 
-- 雲端的 `gemini`、`codex` 大多**按使用量收費**（`gemini` 有免費額度，但有上限）。
-- 用的 AI 越多，一次花得越多。想省錢就只用本機的 `ollama`。
-- 費用要你自己承擔，記得留意帳單。
+- Cloud `gemini` / `codex` mostly **charge by usage** (`gemini` has a free tier with limits).
+- The more AIs you use, the more a single run costs. To save money, use only the local `ollama`.
+- You bear the cost — keep an eye on your bill.
 
-## 金鑰安全
+## Key safety
 
-- **絕對不要把 API 金鑰貼到任何聊天視窗**（Claude、ChatGPT、Gemini 都一樣）。一旦貼出去就等於外洩，要馬上去原網站作廢、重新申請。
-- 金鑰只該存在你電腦的 `~/.zshrc`。可以用內附的工具安全存入：
+- **Never paste an API key into any chat window** (Claude, ChatGPT, Gemini alike). Once pasted it's effectively leaked — revoke and reissue it immediately.
+- A key should only live in your machine's `~/.zshrc`. Use the bundled helper to store it safely:
   ```bash
-  zsh scripts/set-api-key.sh GEMINI_API_KEY   # 跳出提示 → 貼金鑰 → Enter → 完成
+  zsh scripts/set-api-key.sh GEMINI_API_KEY   # prompt → paste key → Enter → done
   zsh scripts/set-api-key.sh OPENAI_API_KEY
   ```
-- 也別把金鑰寫進任何會上傳到 GitHub 的檔案。
+- Don't write a key into any file that gets committed to GitHub.
 
-各個 AI 怎麼安裝設定，看 [`references/backends.md`](references/backends.md)。
+See [`references/backends.md`](references/backends.md) for per-backend setup.
 
 ---
 
-## 免責聲明
+## 中文摘要（補充）
 
-這是一個實驗性的個人專案，**照現況提供，不負任何擔保**。用之前請自己評估適不適合，輸出的結果也請自己再確認。
+這是一個 Claude Code 外掛：Claude 先給答案，再把**同一題**交給**別的 AI**（本機 `ollama`，或雲端 `gemini`／`codex`）重做一次，然後比對。**大家都同意的比較可信，意見不同的地方要特別留意。** 可用於程式碼 review、文獻／事實查證、推理檢核。
+
+使用前請注意：
+
+- **別的 AI 也會出錯**，小型本機模型有時答非所問；最終仍由 Claude 回頭核對原始資料。
+- **隱私**：`ollama` 完全離線不外傳；`gemini`／`codex` 會把素材**上傳雲端**。機密或未發表內容請只用 `ollama`，或不啟用雲端。
+- **費用**：雲端後端多半按用量計費，用越多越貴；省錢就只用 `ollama`。
+- **金鑰安全**：API 金鑰**絕不要貼進任何聊天視窗**（等於外洩，要立刻作廢重發），只存在本機 `~/.zshrc`，可用 `scripts/set-api-key.sh` 安全寫入。
+- 這個功能**非必要**：只用免費離線的 `ollama`、或完全不用交叉檢核都可以。
+
+---
+
+## Disclaimer
+
+This is an experimental personal project, provided **as-is with no warranty**. Evaluate whether it fits your needs, and verify its output yourself.
