@@ -1,12 +1,16 @@
 ---
 name: cross-ai-check
 description: >-
-  把 Claude 自己的結論交給「其他 AI 模型」(ollama 本機模型、codex、gemini 等)做獨立交叉檢核,
-  收集分歧點後再給最終裁決。三種模式:程式碼 review(bug/安全/設計)、事實與文獻查證(主張與引用真偽)、
-  通用推理檢核(邏輯漏洞與反方意見)。當使用者說「用別的 AI 再檢查一次」「跨 AI 比對」「找第二意見」
-  「讓 codex/ollama 也看一下」「交叉驗證這個結論/這段程式/這個說法」,或想降低單一模型的盲點與幻覺時就使用,
-  即使沒有明講 skill 名稱。注意:本 skill 是「Claude 先做、再請外部模型獨立複查、最後彙整」的流程,
-  不是單純呼叫另一個模型代答。
+  Hand Claude's own conclusion to OTHER AI models (local `ollama`, plus cloud `codex`,
+  `gemini`, etc.) for independent cross-verification, collect the points of disagreement, then
+  deliver a final adjudication. Three modes: code review (bugs / security / design), fact &
+  citation checking (are claims and references real), and general reasoning checks (logical gaps
+  and counter-arguments). Use it whenever the user says things like "check this again with another
+  AI", "cross-check across AIs", "get a second opinion", "let codex/ollama take a look too", or
+  "cross-validate this conclusion / this code / this claim", or whenever they want to reduce a
+  single model's blind spots and hallucinations — even if the skill is not named explicitly. Note:
+  this skill is a workflow of "Claude answers first, then external models independently re-check,
+  then Claude synthesizes" — NOT simply calling another model to answer in Claude's place.
 ---
 
 # Cross-AI Check(跨 AI 交叉檢核)
