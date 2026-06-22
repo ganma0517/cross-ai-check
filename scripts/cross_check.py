@@ -19,13 +19,45 @@ cross_check.py — 把同一份「素材 + 檢核問題」送給多個外部 AI 
 """
 import argparse
 import json
+import math
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 import urllib.request
 import urllib.error
+
+# usage cache：cross_check.py 把各後端 token 用量累計寫進這裡，供 statusline 讀取。
+USAGE_CACHE = os.path.expanduser("~/.claude/.crossai-usage.json")
+USAGE_KEEP_DAYS = 7
+
+# CLI 後端（codex/gemini）若有印 token，常見樣式;抓不到再 fallback 估算。
+_TOK_PATTERNS = [
+    re.compile(r"tokens?\s*used[:\s]+([\d,]+)", re.I),
+    re.compile(r"total[_\s]*tokens?[:\s]+([\d,]+)", re.I),
+    re.compile(r"([\d,]+)\s+tokens?\b", re.I),
+]
+
+
+def _estimate_tokens(prompt, response):
+    # 粗估:約 4 字元 / token。input=prompt、output=response。
+    inp = math.ceil(len(prompt or "") / 4)
+    out = math.ceil(len(response or "") / 4)
+    return {"input": inp, "output": out, "total": inp + out, "estimated": True}
+
+
+def _parse_cli_tokens(text):
+    # 從 CLI 的 stdout+stderr 嘗試解析 total token;抓不到回 None。
+    for pat in _TOK_PATTERNS:
+        m = pat.search(text or "")
+        if m:
+            try:
+                return int(m.group(1).replace(",", ""))
+            except ValueError:
+                continue
+    return None
 
 # ---------------------------------------------------------------------------
 # 後端定義。每個後端是一個 dict:
@@ -60,7 +92,15 @@ def _ollama_run(prompt, system):
     )
     with urllib.request.urlopen(req, timeout=300) as r:
         body = json.load(r)
-    return body.get("response", "").strip()
+    text = body.get("response", "").strip()
+    inp = body.get("prompt_eval_count")
+    out = body.get("eval_count")
+    usage = None
+    if inp is not None or out is not None:
+        inp = inp or 0
+        out = out or 0
+        usage = {"input": inp, "output": out, "total": inp + out, "estimated": False}
+    return text, usage
 
 
 def _codex_detect():
@@ -76,7 +116,11 @@ def _codex_run(prompt, system):
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or "codex exit != 0")
-    return proc.stdout.strip()
+    text = proc.stdout.strip()
+    tot = _parse_cli_tokens(proc.stdout + "\n" + (proc.stderr or ""))
+    usage = {"input": 0, "output": 0, "total": tot, "estimated": False} \
+        if tot is not None else _estimate_tokens(full, text)
+    return text, usage
 
 
 def _gemini_detect():
@@ -102,7 +146,11 @@ def _gemini_run(prompt, system):
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or "gemini exit != 0")
-    return proc.stdout.strip()
+    text = proc.stdout.strip()
+    tot = _parse_cli_tokens(proc.stdout + "\n" + (proc.stderr or ""))
+    usage = {"input": 0, "output": 0, "total": tot, "estimated": False} \
+        if tot is not None else _estimate_tokens(full, text)
+    return text, usage
 
 
 BACKENDS = [
@@ -170,7 +218,7 @@ def main():
     results = []
     for b in chosen:
         row = {"name": b["name"], "available": False, "ok": False,
-               "response": None, "error": None, "duration_s": None}
+               "response": None, "error": None, "duration_s": None, "usage": None}
         if not b["detect"]():
             row["error"] = b["note"]
             results.append(row)
@@ -178,7 +226,9 @@ def main():
         row["available"] = True
         t0 = time.time()
         try:
-            row["response"] = b["run"](prompt, args.system)
+            text, usage = b["run"](prompt, args.system)
+            row["response"] = text
+            row["usage"] = usage
             row["ok"] = True
         except Exception as e:
             row["error"] = f"{type(e).__name__}: {e}"
@@ -195,8 +245,49 @@ def main():
         },
     }, ensure_ascii=False, indent=2))
 
+    _record_usage(results)
+
     if not available:
         sys.exit(3)  # 沒有任何後端可用 → 讓呼叫端知道要提醒使用者
+
+
+def _record_usage(results):
+    """把本次各後端的 token 用量累加進今日 cache(供 statusline 顯示)。
+    記帳失敗絕不可中斷主流程,故整段包在 try/except。"""
+    try:
+        today = time.strftime("%Y-%m-%d")
+        try:
+            with open(USAGE_CACHE, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+        except Exception:
+            data = {}
+
+        day = data.setdefault(today, {})
+        for r in results:
+            u = r.get("usage")
+            if not r.get("ok") or not u or not u.get("total"):
+                continue
+            short = r["name"].split(":")[0]  # ollama / codex / gemini
+            slot = day.setdefault(short, {"input": 0, "output": 0,
+                                          "total": 0, "runs": 0, "estimated": False})
+            slot["input"] += u.get("input", 0) or 0
+            slot["output"] += u.get("output", 0) or 0
+            slot["total"] += u.get("total", 0) or 0
+            slot["runs"] += 1
+            if u.get("estimated"):
+                slot["estimated"] = True
+
+        # 修剪:只保留最近 USAGE_KEEP_DAYS 天的日期 key。
+        keep = {time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400))
+                for i in range(USAGE_KEEP_DAYS)}
+        data = {k: v for k, v in data.items() if k in keep}
+
+        with open(USAGE_CACHE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
