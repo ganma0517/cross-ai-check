@@ -91,6 +91,28 @@ See [`references/backends.md`](references/backends.md) for per-backend setup. Cr
 
 ---
 
+## File layout
+
+```
+cross-ai-check/
+├── SKILL.md                        Full workflow, three mode system-prompts, usage
+├── scripts/
+│   ├── cross_check.py              Sends material to backends; returns raw answers
+│   └── set-api-key.sh              Safe key storage helper (writes to ~/.zshrc)
+└── references/
+    └── backends.md                 Per-backend setup: ollama / gemini / codex
+```
+
+---
+
+## When to use / not use
+
+**Use:** when you want a second opinion on Claude's analysis — code review for subtle bugs, fact-checking claims or citations, or auditing a chain of reasoning. Especially valuable when a wrong answer would be costly.
+
+**Don't use:** as a replacement for authoritative fact sources (search wins over LLM for "does this DOI exist?"); when the material is confidential and can't be sent to cloud backends; when speed matters more than correctness.
+
+---
+
 ## 中文摘要（補充）
 
 核心概念是「**獨立交叉驗證**」：Claude 先自己得出結論，再把**同一份原始素材**（不含 Claude 的判斷）交由其他 AI（本機 `ollama` 或雲端 `gemini`/`codex`）各自重做一次，最後比對差異。
